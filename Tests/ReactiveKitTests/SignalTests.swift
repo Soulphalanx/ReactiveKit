@@ -155,10 +155,23 @@ class SignalTests: XCTestCase {
     distinct.expectNext([1, 2, 3])
   }
 
+  
+  func testDistinct3() {
+    let operation = Signal<Int, TestError>.sequence([1, 2, 2, 3])
+    let distinct = operation.distinctAndIgnoreFirst()
+    distinct.expectNext([ 2, 3])
+  }
+
   func testDistinct2() {
     let operation = Signal<Int, TestError>.sequence([1, 2, 2, 3])
     let distinct = operation.distinct()
     distinct.expectNext([1, 2, 3])
+  }
+  
+  func testIgnoreFirst() {
+    let operation = Signal<Int, TestError>.sequence([1, 2, 2, 3])
+    let distinct = operation.ignoreFirst()
+    distinct.expectNext([2, 2, 3])
   }
 
   func testElementAt() {

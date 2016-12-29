@@ -473,6 +473,42 @@ public extension SignalProtocol {
       }
     }
   }
+  
+  /// Ignore Emit first element and then Emit all elements.
+  public func ignoreFirst() -> Signal<Element, Error> {
+    return Signal { observer in
+      var lastElement: Element? = nil
+      return self.observe { event in
+        switch event {
+        case .next(let element):
+          if lastElement != nil{
+            observer.next(element)
+          }
+          lastElement = element
+        default:
+          observer.on(event)
+        }
+      }
+    }
+  }
+  
+  /// Ignore Emit first element and then Emit all elements that are not equal to their predecessor(s).
+  public func distinctAndIgnoreFirst(areDistinct: @escaping (Element, Element) -> Bool) -> Signal<Element, Error> {
+    return Signal { observer in
+      var lastElement: Element? = nil
+      return self.observe { event in
+        switch event {
+        case .next(let element):
+          if lastElement != nil && areDistinct(lastElement!, element) {
+            observer.next(element)
+          }
+          lastElement = element
+        default:
+          observer.on(event)
+        }
+      }
+    }
+  }
 
   /// Emit only element at given index if such element is produced.
   public func element(at index: Int) -> Signal<Element, Error> {
@@ -712,6 +748,11 @@ public extension SignalProtocol where Element: Equatable {
   public func distinct() -> Signal<Element, Error> {
     return distinct(areDistinct: !=)
   }
+  
+  /// Ignore Emit first element and then Emit all elements that are not equal to their predecessor(s).
+  public func distinctAndIgnoreFirst() -> Signal<Element, Error> {
+    return distinctAndIgnoreFirst(areDistinct: !=)
+  }  
 }
 
 public extension SignalProtocol where Element: OptionalProtocol, Element.Wrapped: Equatable {
@@ -719,6 +760,11 @@ public extension SignalProtocol where Element: OptionalProtocol, Element.Wrapped
   /// Emit first element and then all elements that are not equal to their predecessor(s).
   public func distinct() -> Signal<Element, Error> {
     return distinct(areDistinct: !=)
+  }
+  
+  /// Ignore Emit first element and then Emit all elements that are not equal to their predecessor(s).
+  public func distinctAndIgnoreFirst() -> Signal<Element, Error> {
+    return distinctAndIgnoreFirst(areDistinct: !=)
   }
 }
 
