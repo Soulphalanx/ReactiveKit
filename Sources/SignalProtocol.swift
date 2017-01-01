@@ -70,6 +70,15 @@ extension SignalProtocol {
       }
     }
   }
+  
+  /// Register an observer that will be executed on `event.element == true`.
+  public func observeBecameTrue(with observer: @escaping () -> Void) -> Disposable {
+    return observeNext(with: { (element) in
+      if let val = element as? Bool, val == true{
+        observer()
+      }
+    })
+  }
 }
 
 // MARK: - Extensions
