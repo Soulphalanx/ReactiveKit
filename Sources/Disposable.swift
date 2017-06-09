@@ -24,10 +24,19 @@
 
 import Foundation
 
-/// Objects conforming to this protocol dispose (cancel) signals and operations.
+/// A disposable is an object that can be used to cancel a signal observation.
+///
+/// Disposables are returned by `observe*` and `bind*` methods.
+///
+///     let disposable = signal.observe { ... }
+///
+/// Disposing the disposable cancels the observation. A signal is guaranteed not to
+/// fire any event after is has been disposed.
+///
+///     disposable.dispose()
 public protocol Disposable {
 
-  /// Dispose the signal or operation.
+  /// Dispose the signal observation or binding.
   func dispose()
 
   /// Returns `true` is already disposed.
@@ -41,8 +50,7 @@ public struct NonDisposable: Disposable {
 
   private init() {}
 
-  public func dispose() {
-  }
+  public func dispose() {}
 
   public var isDisposed: Bool {
     return false
@@ -82,7 +90,7 @@ public final class BlockDisposable: Disposable {
 }
 
 /// A disposable that disposes itself upon deallocation.
-public class DeinitDisposable: Disposable {
+public final class DeinitDisposable: Disposable {
 
   public var otherDisposable: Disposable? = nil
 
@@ -103,7 +111,7 @@ public class DeinitDisposable: Disposable {
   }
 }
 
-/// A disposable that disposes a collection of disposables upon disposing.
+/// A disposable that disposes a collection of disposables upon its own disposing.
 public final class CompositeDisposable: Disposable {
 
   public private(set) var isDisposed: Bool = false
@@ -128,6 +136,10 @@ public final class CompositeDisposable: Disposable {
     }
   }
 
+  public static func += (left: CompositeDisposable, right: Disposable) {
+    left.add(disposable: right)
+  }
+
   public func dispose() {
     lock.lock(); defer { lock.unlock() }
     isDisposed = true
@@ -136,52 +148,7 @@ public final class CompositeDisposable: Disposable {
   }
 }
 
-public func += (left: CompositeDisposable, right: Disposable) {
-  left.add(disposable: right)
-}
-
-/// A disposable container that will dispose a collection of disposables upon deinit.
-public final class DisposeBag: Disposable {
-  private var disposables: [Disposable] = []
-  private let subject = _ReplayOneSubject<Void, NoError>()
-
-  /// This will return true whenever the bag is empty.
-  public var isDisposed: Bool {
-    return disposables.count == 0
-  }
-
-  public init() {
-  }
-
-  /// Adds the given disposable to the bag.
-  /// Disposable will be disposed when the bag is deinitialized.
-  public func add(disposable: Disposable) {
-    disposables.append(disposable)
-  }
-
-  /// Disposes all disposables that are currenty in the bag.
-  public func dispose() {
-    disposables.forEach { $0.dispose() }
-    disposables.removeAll()
-  }
-  
-  public var deallocated: Signal1<Void> {
-    return subject.toSignal()
-  }
-
-  deinit {
-    dispose()
-    subject.completed()
-  }
-}
-
-public extension Disposable {
-  public func disposeIn(_ disposeBag: DisposeBag) {
-    disposeBag.add(disposable: self)
-  }
-}
-
-/// A disposable that disposes other disposable.
+/// A disposable that disposes other disposable upon its own disposing.
 public final class SerialDisposable: Disposable {
 
   public private(set) var isDisposed: Bool = false
@@ -210,7 +177,82 @@ public final class SerialDisposable: Disposable {
   }
 }
 
-/// A type that provides dispose bag.
-public protocol DisposeBagProvider: class {
-  var disposeBag: DisposeBag { get }
+/// A container of disposables that will dispose the disposables upon deinit.
+/// A bag is a prefered way to handle disposables:
+///
+///     let bag = DisposeBag()
+///
+///     signal
+///       .observe { ... }
+///       .dispose(in: bag)
+///
+/// When bag gets deallocated, it will dispose all disposables it contains.
+public protocol DisposeBagProtocol: Disposable {
+  func add(disposable: Disposable)
+}
+
+/// A container of disposables that will dispose the disposables upon deinit.
+/// A bag is a prefered way to handle disposables:
+///
+///     let bag = DisposeBag()
+///
+///     signal
+///       .observe { ... }
+///       .dispose(in: bag)
+///
+/// When bag gets deallocated, it will dispose all disposables it contains.
+public final class DisposeBag: DisposeBagProtocol {
+
+  private var disposables: [Disposable] = []
+  private var subject: ReplayOneSubject<Void, NoError>?
+  private lazy var lock = NSRecursiveLock(name: "com.reactivekit.disposebag")
+
+  /// `true` if bag is empty, `false` otherwise.
+  public var isDisposed: Bool {
+    return disposables.count == 0
+  }
+
+  public init() {
+  }
+
+  /// Add the given disposable to the bag.
+  /// Disposable will be disposed when the bag is deallocated.
+  public func add(disposable: Disposable) {
+    disposables.append(disposable)
+  }
+
+  /// Add a disposable to a dispose bag.
+  public static func += (left: DisposeBag, right: Disposable) {
+    left.add(disposable: right)
+  }
+
+  /// Disposes all disposables that are currenty in the bag.
+  public func dispose() {
+    disposables.forEach { $0.dispose() }
+    disposables.removeAll()
+  }
+
+  /// A signal that fires `completed` event when the bag gets deallocated.
+  public var deallocated: SafeSignal<Void> {
+    lock.lock()
+    if subject == nil {
+      subject = ReplayOneSubject()
+    }
+    lock.unlock()
+    return subject!.toSignal()
+  }
+
+  deinit {
+    dispose()
+    subject?.completed()
+  }
+}
+
+public extension Disposable {
+
+  /// Put the disposable in the given bag. Disposable will be disposed when
+  /// the bag is either deallocated or disposed.
+  public func dispose(in disposeBag: DisposeBagProtocol) {
+    disposeBag.add(disposable: self)
+  }
 }

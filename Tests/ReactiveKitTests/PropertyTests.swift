@@ -24,7 +24,7 @@ class PropertyTests: XCTestCase {
   }
 
   func testEvents() {
-    property.expect(
+    property.expectAsync(events: 
       [
       .next(0),
       .next(5),
@@ -38,7 +38,7 @@ class PropertyTests: XCTestCase {
 
     property.value = 5
     property.value = 10
-    Signal1.sequence([20, 30]).bind(to: property)
+    SafeSignal.sequence([20, 30]).bind(to: property)
     property.value = 40
 
     weak var weakProperty = property
@@ -52,7 +52,7 @@ class PropertyTests: XCTestCase {
     var readOnlyView: AnyProperty<Int>! = property.readOnlyView
     XCTAssert(readOnlyView.value == 0)
 
-    readOnlyView.expect(
+    readOnlyView.expectAsync(events: 
       [
         .next(0),
         .next(5),
@@ -66,7 +66,7 @@ class PropertyTests: XCTestCase {
 
     property.value = 5
     property.value = 10
-    Signal1.sequence([20, 30]).bind(to: property)
+    SafeSignal.sequence([20, 30]).bind(to: property)
     property.value = 40
 
     XCTAssert(readOnlyView.value == 40)
@@ -84,11 +84,13 @@ class PropertyTests: XCTestCase {
   func testBidirectionalBind() {
     let target = Property(100)
 
-    target.expectNext([100, 0, 50, 60])
-    property.expectNext([0, 0, 50, 60])
+    target.ignoreTerminal().expectAsync(events: [.next(100), .next(0), .next(50), .next(60)], expectation: expectation(description: "nexts"))
+    property.ignoreTerminal().expectAsync(events: [.next(0), .next(0), .next(50), .next(60)], expectation: expectation(description: "nexts"))
 
     property.bidirectionalBind(to: target)
     property.value = 50
     target.value = 60
+    
+    waitForExpectations(timeout: 2, handler: nil)
   }
 }

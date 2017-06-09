@@ -22,28 +22,17 @@
 //  THE SOFTWARE.
 //
 
-/// An event of a sequence.
-public enum Event<Element, Error: Swift.Error> {
+public typealias Signal1<Element> = Signal<Element, NoError>
+public typealias SafeSignal<Element> = Signal<Element, NoError>
 
-  /// An event that carries next element.
-  case next(Element)
+public typealias Observer1<Element> = (Event<Element, NoError>) -> Void
+public typealias SafeObserver<Element> = (Event<Element, NoError>) -> Void
 
-  /// An event that represents failure. Carries an error.
-  case failed(Error)
+public typealias PublishSubject1<Element> = PublishSubject<Element, NoError>
+public typealias SafePublishSubject<Element> = PublishSubject<Element, NoError>
 
-  /// An event that marks the completion of a sequence.
-  case completed
-}
+public typealias ReplaySubject1<Element> = ReplaySubject<Element, NoError>
+public typealias SafeReplaySubject<Element> = ReplaySubject<Element, NoError>
 
-extension Event {
-
-  /// Return `true` in case of `.failure` or `.completed` event.
-  public var isTerminal: Bool {
-    switch self {
-    case .next:
-      return false
-    default:
-      return true
-    }
-  }
-}
+public typealias ReplayOneSubject1<Element> = ReplayOneSubject<Element, NoError>
+public typealias SafeReplayOneSubject<Element> = ReplayOneSubject<Element, NoError>
